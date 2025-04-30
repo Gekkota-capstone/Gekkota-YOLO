@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+python-dotenv
+boto3
+opencv-python==4.10.0.82
+torch==2.6.0
+torchvision==0.21.0
+numpy==1.26.4
+pandas==2.2.2
+pydantic==2.10.6
+ultralytics==8.3.107

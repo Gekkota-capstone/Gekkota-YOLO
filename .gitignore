@@ -1,1 +1,180 @@
+### Python ###
+# 바이트 컴파일된 파일 / 최적화 / DLL 파일
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 배포 / 패키징
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 유닛 테스트 / 커버리지 보고서
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# 번역
+*.mo
+*.pot
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask
+instance/
+.webassets-cache
+
+# Scrapy
+.scrapy
+
+# Sphinx 문서
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# celery beat schedule file
+celerybeat-schedule
+
+# SageMath parsed files
+*.sage.py
+
+# 환경
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder 프로젝트 설정
+.spyderproject
+.spyproject
+
+# Rope 프로젝트 설정
+.ropeproject
+
+# mkdocs 문서
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+### YOLO 모델 및 데이터 ###
+# 모델 가중치 파일 (큰 파일이므로 제외)
+*.pt
+*.pth
+*.weights
+*.onnx
+*.tflite
+*.pb
+
+# 임시 데이터 디렉토리
+data/
+runs/
+temp/
+*.tmp
+
+# 이미지 및 비디오 파일 (테스트 데이터 제외)
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.gif
+*.mp4
+*.avi
+*.mov
+*.mp3
+*.wav
+
+# 결과 디렉토리
+results/
+output/
+
+### FastAPI ###
+.pytest_cache/
+
+### IDE ###
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+*.iws
+out/
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+### 시스템 파일 ###
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+### 로그 파일 ###
+logs/
+*.log
+
+### AWS 관련 ###
+.aws/
+aws-credentials.json
+
+### 프로젝트 특화 ###
+# S3 다운로드된 임시 폴더
+*_*/
+
+# 빌드 출력 디렉토리
+dist/
+build/
+
+# 로컬 개발 파일
+local_dev/
