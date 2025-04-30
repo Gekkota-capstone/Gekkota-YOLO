@@ -1,0 +1,1 @@
+# yolo table 정의
