@@ -9,13 +9,14 @@ import argparse
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from db.s3_utils import s3_client, S3_BUCKET
+from db.database import Base, engine
 
 # 프로젝트 루트 경로를 시스템 경로에 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 좀 더 자세한 로깅 설정
 logging.basicConfig(
-    level=logging.DEBUG,  # DEBUG로 변경하여 더 많은 로그 확인
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
@@ -24,9 +25,36 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# 데이터베이스 테이블 생성
+Base.metadata.create_all(bind=engine)
+
 # 환경변수 로드
 load_dotenv()
-print(f"✅ 실행 진입: {__file__}")
+
+
+
+# 데이터베이스 스키마 및 테이블 생성 함수
+def init_db():
+    try:
+        logger.info("데이터베이스 초기화 시작...")
+
+        # capstone 스키마 생성 (없는 경우)
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("CREATE SCHEMA IF NOT EXISTS app"))
+            conn.commit()
+            logger.info("capstone 스키마 확인 완료")
+
+        # 테이블 생성
+        Base.metadata.create_all(bind=engine)
+        logger.info("데이터베이스 테이블 생성 완료")
+    except Exception as e:
+        logger.error(f"데이터베이스 초기화 중 오류 발생: {str(e)}", exc_info=True)
+
+
+# 데이터베이스 초기화 실행
+init_db()
+
 # 상수 설정
 SERIAL_NUMBER = "SFRXC12515GF00001"  # 고정된 시리얼 번호
 SLEEP_INTERVAL = 1  # 고정값 1초
