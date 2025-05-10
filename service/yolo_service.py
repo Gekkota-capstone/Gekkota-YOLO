@@ -12,27 +12,22 @@ from router.model.yolo_model import YoloResponse
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# YOLO 모델 설정
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.3"))
 YOLO_MODEL_PATH = os.getenv("YOLO_MODEL_PATH", "train7_0510_black/weights/best.pt")
 MAX_DETECTIONS = int(os.getenv("MAX_DETECTIONS", "1"))
-
 
 class YoloService:
     def __init__(self, db: Session):
         self.db = db
         self.repository = YoloRepository(db)
         self.model = self._load_yolo_model()
-        # 키포인트 이름 정의
         self.keypoint_names = [
             "head", "neck", "Rhand", "Lhand",
             "back", "Lfoot", "Rfoot", "tail"
         ]
-    
+
     def _load_yolo_model(self):
-        """Load YOLO model for inference"""
         try:
-            # Ultralytics YOLO 모델 로드
             from ultralytics import YOLO
             model = YOLO(YOLO_MODEL_PATH)
             model.to('cuda')
@@ -41,112 +36,63 @@ class YoloService:
         except Exception as e:
             logger.error(f"Error loading YOLO model: {str(e)}")
             return None
-    
+
     async def process_images(self, serial_number: str, request_date: date) -> YoloResponse:
-        """
-        Process images from S3 based on serial number and date
-        
-        Args:
-            serial_number: 장치 시리얼 번호
-            request_date: 요청 날짜
-        
-        Returns:
-            YoloResponse 객체 (처리 결과 정보)
-        """
-        # 날짜 문자열 변환 (YYYYMMDD 형식)
         date_str = request_date.strftime("%Y%m%d")
-        
-        # 로컬 폴더 생성
         local_folder = f"{serial_number}_{date_str}"
         os.makedirs(local_folder, exist_ok=True)
-        
+
         try:
-            # S3에서 이미지 다운로드
             s3_prefix = f"opencv/{serial_number}/{date_str}/"
             downloaded_files = self._download_images_from_s3(s3_prefix, local_folder)
-            
+
             if not downloaded_files:
                 return YoloResponse(
                     status="warning",
                     message="No images found in S3 for the given criteria",
                     processed_images=0
                 )
-            
-            # 이미지 처리 및 결과 저장
+
             processed_count = await self._process_local_images(local_folder, serial_number, request_date)
-            
+
             return YoloResponse(
                 status="success",
                 message=f"Successfully processed {processed_count} images",
                 processed_images=processed_count
             )
-            
+
         except Exception as e:
             logger.error(f"Error in process_images: {str(e)}")
             raise
         finally:
-            # 로컬 폴더 삭제
             if os.path.exists(local_folder):
                 shutil.rmtree(local_folder)
 
     def _download_images_from_s3(self, prefix: str, local_folder: str) -> List[str]:
-        """
-        Download images from S3 with the given prefix to local folder and delete them from S3
-        """
         downloaded_files = []
 
         try:
-            # S3 버킷 내 해당 prefix의 객체 리스트 가져오기
             logger.info(f"S3에서 객체 리스트 요청 - 버킷: {S3_BUCKET}, 접두사: {prefix}")
-
-            # 디버깅을 위해 S3 버킷 내용 출력
-            try:
-                all_objects = s3_client.list_objects_v2(Bucket=S3_BUCKET)
-                if 'Contents' in all_objects:
-                    logger.info(f"S3 버킷 내 객체 수: {len(all_objects['Contents'])}")
-                    for obj in all_objects['Contents'][:5]:  # 처음 5개만 로그로 출력
-                        logger.info(f"S3 객체: {obj['Key']}")
-                else:
-                    logger.warning(f"S3 버킷 {S3_BUCKET}에 객체가 없습니다.")
-            except Exception as e:
-                logger.error(f"S3 버킷 전체 조회 실패: {str(e)}")
-
-            # 실제 지정된 prefix로 객체 검색
             response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix)
 
             if 'Contents' not in response:
                 logger.warning(f"No objects found in S3 with prefix: {prefix}")
-                # 더 넓은 범위로 한번 더 검색 (디버깅용)
-                broader_prefix = '/'.join(prefix.split('/')[:-2]) + '/'
-                logger.info(f"더 넓은 범위로 다시 검색 시도: {broader_prefix}")
-                try:
-                    broader_response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=broader_prefix)
-                    if 'Contents' in broader_response:
-                        logger.info(f"더 넓은 범위({broader_prefix})에서 {len(broader_response['Contents'])}개 객체 발견")
-                        for obj in broader_response['Contents'][:5]:  # 처음 5개만 로그로 출력
-                            logger.info(f"발견된 객체: {obj['Key']}")
-                except Exception as e:
-                    logger.error(f"더 넓은 범위 검색 실패: {str(e)}")
                 return downloaded_files
 
             logger.info(f"S3에서 {len(response['Contents'])}개 객체 발견")
 
             for obj in response['Contents']:
                 key = obj['Key']
-                # 이미지 파일만 다운로드 (확장자 체크)
                 if any(key.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png']):
-                    # 로컬 파일 경로
                     filename = os.path.basename(key)
                     local_path = os.path.join(local_folder, filename)
 
                     logger.info(f"다운로드 시도: {key} -> {local_path}")
-                    # S3에서 다운로드
                     s3_client.download_file(S3_BUCKET, key, local_path)
                     downloaded_files.append(local_path)
                     logger.info(f"다운로드 성공: {key} -> {local_path}")
 
                     try:
-                        # S3에서 이미지 삭제
                         logger.info(f"S3 객체 삭제 시도: {key}")
                         s3_client.delete_object(Bucket=S3_BUCKET, Key=key)
                         logger.info(f"S3 객체 삭제 성공: {key}")
@@ -158,97 +104,72 @@ class YoloService:
         except Exception as e:
             logger.error(f"Error downloading from S3: {str(e)}", exc_info=True)
             raise
-    
+
     async def _process_local_images(self, folder_path: str, serial_number: str, request_date: date) -> int:
-        """
-        Process all images in the local folder with YOLO
-        """
         processed_count = 0
-        
-        # 폴더 내 모든 이미지 파일 가져오기
         image_files = [f for f in os.listdir(folder_path)
-                      if os.path.isfile(os.path.join(folder_path, f)) and
-                      any(f.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png'])]
-        
+                       if os.path.isfile(os.path.join(folder_path, f)) and
+                       any(f.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png'])]
+
         if not image_files:
             logger.warning(f"No image files found in folder: {folder_path}")
             return processed_count
-        
-        # 전체 폴더에 대해 한 번에 YOLO 추론 실행
+
         try:
             results = self._run_yolo_inference(folder_path)
-            
-            # 결과를 처리하고 DB에 저장
+
             for result in results:
                 image_filename = os.path.basename(result.path)
-                
-                # 타임스탬프 추출 (예: 20250417_170454)
-                timestamp_match = re.search(r"(\d{8}\_\d{6})", image_filename)
+                timestamp_match = re.search(r"(\d{8}_\d{6})", image_filename)
                 timestamp = timestamp_match.group(1) if timestamp_match else None
-                
-                # JSON으로 변환할 데이터 구성
+
                 yolo_result = self._format_yolo_result(result, image_filename, timestamp)
-                
-                # S3 경로 형식으로 이미지 경로 구성 (request_date는 S3 폴더 경로에만 사용)
-                # 날짜 형식을 YYYYMMDD로 변환
                 date_str = request_date.strftime('%Y%m%d')
                 image_s3_path = f"opencv/{serial_number}/{date_str}/{image_filename}"
-                
-                # Repository를 통해 DB에 저장 - 파일명 파싱은 Repository에서 처리
+
                 self.repository.create(
                     image_path=image_s3_path,
                     image_filename=image_filename,
                     yolo_result=yolo_result
                 )
-                
+
                 processed_count += 1
                 logger.info(f"Processed image: {image_filename}")
-                
-                # 로컬에서 처리 완료된 이미지 삭제
+
                 image_path = os.path.join(folder_path, image_filename)
                 if os.path.exists(image_path):
                     os.remove(image_path)
-                
+
         except Exception as e:
             logger.error(f"Error processing images in folder {folder_path}: {str(e)}")
             raise
-        
+
         return processed_count
-    
+
     def _run_yolo_inference(self, folder_path: str) -> List:
-        """
-        Run YOLO inference on all images in a folder
-        """
         if self.model is None:
             raise Exception("YOLO model not loaded")
-        
+
         try:
-            # 폴더 내 모든 이미지에 대해 YOLO 추론 실행
             results = self.model.predict(
                 source=folder_path,
                 conf=CONFIDENCE_THRESHOLD,
-                device=0,  # 환경 변수로 설정 가능
+                device=0,
                 max_det=MAX_DETECTIONS
             )
-            
             return results
-            
+
         except Exception as e:
             logger.error(f"YOLO inference error: {str(e)}")
             raise
-    
+
     def _format_yolo_result(self, result, filename: str, timestamp: str) -> Dict[str, Any]:
-        """
-        Format YOLO result to JSON format for database storage
-        바운딩 박스 및 키포인트 정보와 타임스탬프 포함
-        """
         formatted_result = {
             "timestamp": timestamp,
             "boxes": [],
             "keypoints": []
         }
-        
-        # 바운딩 박스 정보 추출
+
         if result.boxes is not None:
             for box in result.boxes:
                 formatted_result["boxes"].append({
@@ -256,15 +177,13 @@ class YoloService:
                     "conf": float(box.conf[0].item()) if box.conf is not None else 0.0,
                     "cls": int(box.cls[0].item()) if box.cls is not None else -1
                 })
-        
-        # 키포인트 정보 추출
+
         if result.keypoints is not None:
             for kp_set in result.keypoints:
                 keypoints = []
                 kps = kp_set.xy[0].tolist() if kp_set.xy is not None else []
                 confs = kp_set.conf[0].tolist() if kp_set.conf is not None else []
-                
-                # 각 키포인트에 이름 매핑
+
                 for i in range(len(kps)):
                     keypoint_name = self.keypoint_names[i] if i < len(self.keypoint_names) else f"kpt_{i}"
                     keypoints.append({
@@ -272,7 +191,7 @@ class YoloService:
                         "xy": kps[i],
                         "conf": float(confs[i]) if i < len(confs) else 0.0
                     })
-                
+
                 formatted_result["keypoints"].append(keypoints)
-        
+
         return formatted_result
