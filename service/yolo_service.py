@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # YOLO 모델 설정
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.3"))
-YOLO_MODEL_PATH = os.getenv("YOLO_MODEL_PATH", "train4_saffir_epoch200/weights/best.pt")
+YOLO_MODEL_PATH = os.getenv("YOLO_MODEL_PATH", "train7_0510_black/weights/best.pt")
 MAX_DETECTIONS = int(os.getenv("MAX_DETECTIONS", "1"))
 
 
@@ -35,6 +35,7 @@ class YoloService:
             # Ultralytics YOLO 모델 로드
             from ultralytics import YOLO
             model = YOLO(YOLO_MODEL_PATH)
+            model.to('cuda')
             logger.info(f"Successfully loaded YOLO model from {YOLO_MODEL_PATH}")
             return model
         except Exception as e:
@@ -226,7 +227,7 @@ class YoloService:
             results = self.model.predict(
                 source=folder_path,
                 conf=CONFIDENCE_THRESHOLD,
-                device="cpu",  # 환경 변수로 설정 가능
+                device=0,  # 환경 변수로 설정 가능
                 max_det=MAX_DETECTIONS
             )
             
